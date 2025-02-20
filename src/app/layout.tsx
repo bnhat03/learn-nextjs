@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import SidebarWrapper from "@/components/SidebarWrapper";
 import { UserProvider } from "@/context/UserContext";
+import { ToastContainer } from "react-toastify";
 
 export const metadata: Metadata = {
   title: "Homepage",
@@ -20,6 +21,18 @@ export default function RootLayout({
             {children}
           </div>
         </UserProvider>
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </body>
     </html>
   );

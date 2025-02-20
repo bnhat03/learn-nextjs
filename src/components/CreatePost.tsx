@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, ChangeEvent, FormEvent, useRef } from "react";
-import toast from "react-hot-toast";
+import { toast } from "react-toastify";
 import { CiImageOn } from "react-icons/ci";
 import { mutate } from "swr";
 import { useUser } from "@/context/UserContext";

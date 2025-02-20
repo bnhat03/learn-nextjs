@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaRegComment } from "react-icons/fa";
+import { FaRegComment, FaTrash } from "react-icons/fa";
 import { FaRegHeart } from "react-icons/fa";
 import Link from "next/link";
 import { useUser } from "@/context/UserContext";
-import toast from "react-hot-toast";
+import { toast } from "react-toastify";
 import { mutate } from "swr";
 
 const Post: React.FC<IProps> = ({ post, feedType }) => {
@@ -16,9 +16,34 @@ const Post: React.FC<IProps> = ({ post, feedType }) => {
   const isLiked: boolean =
     post.likes?.some((like) => like?.userId === userId) ?? false;
 
-  // // const isMyPost = true;
-  // const handleDeletePost = () => {
-  // };
+  const isMyPost = String(postOwner.id) === String(userId);
+  const handleDeletePost = async () => {
+    if (confirm(`Bạn muốn xóa post này (id = ${post.id})`)) {
+      fetch(`${backendUrl}/api/posts/${post.id}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+        },
+      })
+        .then((res) => res.json())
+        .then(async (res) => {
+          if (res) {
+            toast.success("Delete blog succeed !");
+            await mutate(`${backendUrl}/api/posts`, undefined, {
+              revalidate: true,
+            });
+            await mutate(
+              `${backendUrl}/api/posts/user/${postOwner.id}`,
+              undefined,
+              {
+                revalidate: true,
+              }
+            );
+          }
+        });
+    }
+  };
 
   const postComment = async (
     postId: number,
@@ -143,6 +168,14 @@ const Post: React.FC<IProps> = ({ post, feedType }) => {
               @{postOwner.username}
             </Link>
           </span>
+          {isMyPost && (
+            <span className="flex justify-end flex-1">
+              <FaTrash
+                className="cursor-pointer hover:text-red-500"
+                onClick={handleDeletePost}
+              />
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-3 overflow-hidden">
           <span>{post.content}</span>
