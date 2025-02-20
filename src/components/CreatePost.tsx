@@ -2,17 +2,19 @@
 import React, { useState, ChangeEvent, FormEvent, useRef } from "react";
 import { toast } from "react-toastify";
 import { CiImageOn } from "react-icons/ci";
-import { mutate } from "swr";
+import { useSWRConfig } from "swr";
 import { useUser } from "@/context/UserContext";
+import { createPost } from "@/services/api";
 
 const CreatePost: React.FC = () => {
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
   const [content, setContent] = useState<string>("");
   const [imgPreview, setImgPreview] = useState<string | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userId } = useUser();
-  // Thay đổi file ảnh post
+  const { mutate } = useSWRConfig(); // Hook từ SWR để revalidate data
+
+  // Xử lý chọn file ảnh
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -26,34 +28,13 @@ const CreatePost: React.FC = () => {
     }
   };
 
-  // Đăng ảnh
+  // Xử lý gửi form
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-    if (!token) {
-      toast.error("User not authorized");
-      return;
-    }
     try {
-      const formData = new FormData();
-      formData.append("content", content);
-      if (fileInputRef.current?.files && fileInputRef.current.files[0]) {
-        formData.append("image", fileInputRef.current.files[0]);
-      }
-      const response = await fetch(`${backendUrl}/api/posts/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const imageFile = fileInputRef.current?.files?.[0];
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to create post");
-      }
-
-      const data = await response.json();
+      await createPost(content, imageFile);
       toast.success("Post created successfully!");
 
       // Reset form
@@ -61,7 +42,7 @@ const CreatePost: React.FC = () => {
       setImgPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
-      //useSWR =>  đồng bộ dữ liệu
+      // Revalidate dữ liệu để cập nhật bài post mới
       await mutate(`${backendUrl}/api/posts`, undefined, {
         revalidate: true,
       });
@@ -69,8 +50,8 @@ const CreatePost: React.FC = () => {
         revalidate: true,
       });
     } catch (error: any) {
-      toast.error(error.message || "Something went wrong!");
-      console.error(error);
+      toast.error(error.response?.data?.message || "Something went wrong!");
+      console.error("Error creating post:", error);
     }
   };
 
@@ -102,12 +83,10 @@ const CreatePost: React.FC = () => {
         className="hidden"
       />
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 items-center">
-          <CiImageOn
-            className="fill-primary w-6 h-6 cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          />
-        </div>
+        <CiImageOn
+          className="fill-primary w-6 h-6 cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        />
         <button
           type="submit"
           className="btn btn-primary rounded-full text-white px-4"

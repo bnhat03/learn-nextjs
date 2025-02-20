@@ -4,15 +4,12 @@ import React, { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { useUser } from "@/context/UserContext";
+import { login } from "@/services/api";
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
   const { setUserId, setIsLoggedIn, setUsername } = useUser();
-  const [formData, setFormData] = useState<LoginFormData>({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,31 +21,20 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    console.log("formData: ", formData);
-    try {
-      const res = await fetch(`${backendUrl}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData }),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Không đúng email hoặc mật khẩu");
-      }
-      const data = await res.json();
-      toast.success(data.message || "Login succeed!");
-      localStorage.setItem("token", data.token);
 
-      // context api
-      if (data.userId) {
-        setUserId(data.userId);
-        setIsLoggedIn(true);
-        setUsername(data.username);
-      }
+    try {
+      const { data } = await login(formData.email, formData.password);
+      toast.success(data.message || "Login successful!");
+      localStorage.setItem("token", data.token);
+      // Cập nhật context API
+      setUserId(data.userId);
+      setIsLoggedIn(true);
+      setUsername(data.username);
       router.push("/");
     } catch (err: any) {
-      toast.error(err.message || "Something went wrong!");
-      setError(err.message);
+      toast.error(err.response?.data?.message || "Something went wrong!");
+      console.log(error);
+      setError(err.response?.data?.message || "Login failed");
     } finally {
       setIsLoading(false);
     }

@@ -1,81 +1,47 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaRegComment, FaTrash } from "react-icons/fa";
-import { FaRegHeart } from "react-icons/fa";
+import { FaRegComment, FaTrash, FaRegHeart } from "react-icons/fa";
 import Link from "next/link";
 import { useUser } from "@/context/UserContext";
 import { toast } from "react-toastify";
 import { mutate } from "swr";
+import { deletePost, postComment, likeUnlikePost } from "@/services/api";
 
 const Post: React.FC<IProps> = ({ post, feedType }) => {
   const { userId } = useUser();
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
   const [comment, setComment] = useState<string>("");
   const postOwner = post.user;
-  const isLiked: boolean =
-    post.likes?.some((like) => like?.userId === userId) ?? false;
-
+  const isLiked = post.likes?.some((like) => like?.userId === userId) ?? false;
   const isMyPost = String(postOwner.id) === String(userId);
-  const handleDeletePost = async () => {
-    if (confirm(`Bạn muốn xóa post này (id = ${post.id})`)) {
-      fetch(`${backendUrl}/api/posts/${post.id}`, {
-        method: "DELETE",
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-        },
-      })
-        .then((res) => res.json())
-        .then(async (res) => {
-          if (res) {
-            toast.success("Delete blog succeed !");
-            await mutate(`${backendUrl}/api/posts`, undefined, {
-              revalidate: true,
-            });
-            await mutate(
-              `${backendUrl}/api/posts/user/${postOwner.id}`,
-              undefined,
-              {
-                revalidate: true,
-              }
-            );
-          }
-        });
-    }
-  };
 
-  const postComment = async (
-    postId: number,
-    commentContent: string
-  ): Promise<any> => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("User not authorized");
+  const handleDeletePost = async () => {
+    try {
+      if (confirm(`Bạn muốn xóa post này (id = ${post.id})`)) {
+        await deletePost(post.id);
+        toast.success("Xóa bài viết thành công!");
+        await mutate(`${backendUrl}/api/posts`, undefined, {
+          revalidate: true,
+        });
+        await mutate(
+          `${backendUrl}/api/posts/user/${postOwner.id}`,
+          undefined,
+          {
+            revalidate: true,
+          }
+        );
+      }
+    } catch (error) {
+      console.log(error);
     }
-    const response = await fetch(`${backendUrl}/api/posts/${postId}/comments`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json, text/plain, */*",
-      },
-      body: JSON.stringify({
-        content: commentContent,
-      }),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || "Failed to post comment");
-    }
-    return response.json();
   };
 
   const handlePostComment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const data = await postComment(post.id, comment);
-      toast.success("Comment posted successfully!");
+      await postComment(post.id, comment);
+      toast.success("Bình luận thành công!");
       setComment("");
       await mutate(`${backendUrl}/api/posts`, undefined, {
         revalidate: true,
@@ -83,63 +49,21 @@ const Post: React.FC<IProps> = ({ post, feedType }) => {
       await mutate(`${backendUrl}/api/posts/user/${postOwner.id}`, undefined, {
         revalidate: true,
       });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to post comment");
-      console.error(error);
-    }
+    } catch {}
   };
 
-  const handleLikeUnlikePost = async (postId: number) => {
+  const handleLikeUnlikePost = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast.error("User not authorized");
-        return;
-      }
-      let response;
-      if (!isLiked) {
-        // Nếu chưa like, tạo like mới
-        response = await fetch(`${backendUrl}/api/posts/${postId}/likes`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json, text/plain, */*",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } else {
-        // Nếu đã like, xóa like
-        response = await fetch(`${backendUrl}/api/likes/${postId}`, {
-          method: "DELETE",
-          headers: {
-            Accept: "application/json, text/plain, */*",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
-
-      // Kiểm tra Content-Type của response
-      const contentType = response.headers.get("content-type");
-      let data;
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-        data = { message: data };
-      }
-      toast.success("Operation succeed!");
-      // useSWR
+      await likeUnlikePost(post.id, isLiked);
+      toast.success("Cập nhật like thành công!");
       await mutate(`${backendUrl}/api/posts`, undefined, {
         revalidate: true,
       });
       await mutate(`${backendUrl}/api/posts/user/${postOwner.id}`, undefined, {
         revalidate: true,
       });
-    } catch (error: any) {
-      console.error(error);
-      toast.error("Something went wrong!");
-      throw new Error(error);
+    } catch (error) {
+      console.log(error);
     }
   };
 
@@ -265,7 +189,7 @@ const Post: React.FC<IProps> = ({ post, feedType }) => {
             </dialog>
             <div
               className="flex gap-1 items-center group cursor-pointer"
-              onClick={() => handleLikeUnlikePost(post.id)}
+              onClick={() => handleLikeUnlikePost()}
             >
               {!isLiked ? (
                 <FaRegHeart className="w-4 h-4 cursor-pointer text-slate-500 group-hover:text-pink-500" />
